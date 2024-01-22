@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind utilities;
+@tailwind variants;
+
+:root {
+  --dark-blue: 209, 23%, 22%;
+  --very-dark-blue: 207, 26%, 17%;
+  --very-dark-blue-text: 200, 15%, 8%;
+  --dark-gray: 0, 0%, 52%;
+  --very-light-gray: 0, 0%, 98%;
+  --white: 0, 0%, 100%;
+}
+
+#app {
+  min-height: 100vh;
+  background-color: hsl(var(--very-light-gray));
+}
+
+.dark #app {
+  background-color: hsl(var(--very-dark-blue));
+}
