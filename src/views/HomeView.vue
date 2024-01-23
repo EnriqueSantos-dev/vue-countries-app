@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useDebounce } from '@vueuse/core'
-import { onMounted, ref, watch } from 'vue'
+import { useDebounce, useFetch } from '@vueuse/core'
+import { ref, watch } from 'vue'
 
 import CountryCard from '@/components/CountryCard.vue'
 import SearchInput from '@/components/SearchInput.vue'
@@ -9,52 +9,43 @@ import Skeleton from '@/components/Skeleton.vue'
 import { baseURL } from '@/constants/api'
 import { regions } from '@/constants/regions'
 
-import type { Country } from '@/types'
 import { mapApiResponseToEntity } from '@/helpers/map-api-response-to-entity'
+import type { Country } from '@/types'
 
-type Regions = (typeof regions)[number] | ''
+type Regions = (typeof regions)[number]
 
-const status = ref<'idle' | 'loading' | 'error'>('idle')
-const countries = ref<Country[]>([])
+const url = ref(`${baseURL}/all`)
 const region = ref<Regions>('All')
 const search = ref<string>('')
 
-const debouncedSearch = useDebounce(search, 500)
-
-const fetchCountries = async (url: string) => {
-  try {
-    const res = await fetch(url)
-
-    if (!res.ok) {
-      throw new Error('Something went wrong')
-    }
-
-    const data = await res.json()
-    countries.value = data.map(mapApiResponseToEntity)
-    status.value = 'idle'
-  } catch {
-    status.value = 'error'
+const {
+  isFetching,
+  data: countries,
+  error
+} = useFetch<Country[]>(url, {
+  refetch: true,
+  async afterFetch(ctx) {
+    const countries = await ctx.response.json()
+    ctx.data = countries.map(mapApiResponseToEntity)
+    return ctx
   }
-}
-
-onMounted(() => {
-  status.value = 'loading'
-  fetchCountries(`${baseURL}/all`)
 })
+
+const debouncedSearch = useDebounce(search, 500)
 
 watch(region, () => {
   const regionValue = region.value
-  const url =
+  const newUrl =
     regionValue === 'All' ? `${baseURL}/all` : `${baseURL}/region/${regionValue.toLowerCase()}`
-  status.value = 'loading'
-  fetchCountries(url)
+  url.value = newUrl
 })
 
 watch(debouncedSearch, () => {
   const searchValue = debouncedSearch.value
-  const url = searchValue === '' ? `${baseURL}/all` : `${baseURL}/name/${searchValue.toLowerCase()}`
-  status.value = 'loading'
-  fetchCountries(url)
+
+  const newUrl =
+    searchValue === '' ? `${baseURL}/all` : `${baseURL}/name/${searchValue.toLowerCase()}`
+  url.value = newUrl
 })
 </script>
 
@@ -73,15 +64,17 @@ watch(debouncedSearch, () => {
   <div
     class="relative grid grid-cols-1 md:grid-cols-[repeat(auto-fill,320px)] place-content-evenly gap-5"
   >
-    <template v-if="status === 'loading'">
+    <template v-if="isFetching">
       <Skeleton v-for="index in 20" :key="index" class="aspect-[3/3.5]" />
     </template>
-    <div v-else-if="status === 'error'" class="text-center">
-      <span class="text-xl left-1/2 -translate-x-1/2 inline-block dark:text-white absolute">
+    <div v-if="error" class="text-center">
+      <span
+        class="text-xl left-1/2 text-center -translate-x-1/2 inline-block dark:text-white absolute"
+      >
         {{ search === '' ? 'No countries found' : 'No countries found for this search' }}
       </span>
     </div>
-    <template v-else>
+    <template v-if="countries">
       <CountryCard v-for="country in countries" :key="country.name.common" :country="country" />
     </template>
   </div>
